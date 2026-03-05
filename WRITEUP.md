@@ -1,12 +1,5 @@
-# Write-up Template
+## Final Decision: Azure App Service
 
-### Analyze, choose, and justify the appropriate resource option for deploying the app.
+Azure App Service is the better choice for deploying the CMS application because it is easy to manage and requires less infrastructure setup compared to a Virtual Machine. 
 
-*For **both** a VM or App Service solution for the CMS app:*
-- *Analyze costs, scalability, availability, and workflow*
-- *Choose the appropriate solution (VM or App Service) for deploying the app*
-- *Justify your choice*
-
-### Assess app changes that would change your decision.
-
-*Detail how the app and any other needs would have to change for you to change your decision in the last section.* 
+It provides built-in scalability, high availability, and supports easy deployment using CI/CD tools like GitHub Actions. Since this CMS project is a simple web application, Azure App Service allows faster deployment and simpler maintenance while reducing infrastructure management.
