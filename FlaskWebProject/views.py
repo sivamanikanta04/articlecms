@@ -8,8 +8,7 @@ from werkzeug.urls import url_parse
 from config import Config
 from FlaskWebProject import app, db
 from FlaskWebProject.forms import LoginForm, PostForm
-from flask_login import current_user, login_user, logout_user, login_required
-from FlaskWebProject.models import User, Post
+from flask_login import current_user, logout_user, login_required
 import msal
 import uuid
 
@@ -19,22 +18,16 @@ imageSourceUrl = 'https://' + app.config['BLOB_ACCOUNT'] + '.blob.core.windows.n
 @app.route('/home')
 @login_required
 def home():
-    user = User.query.filter_by(username=current_user.username).first_or_404()
-    posts = Post.query.all()
     return render_template(
         'index.html',
         title='Home Page',
-        posts=posts
+        posts=[]
     )
 
 @app.route('/new_post', methods=['GET', 'POST'])
 @login_required
 def new_post():
     form = PostForm(request.form)
-    if form.validate_on_submit():
-        post = Post()
-        post.save_changes(form, request.files['image_path'], current_user.id, new=True)
-        return redirect(url_for('home'))
     return render_template(
         'post.html',
         title='Create Post',
@@ -45,12 +38,7 @@ def new_post():
 @app.route('/post/<int:id>', methods=['GET', 'POST'])
 @login_required
 def post(id):
-    post = Post.query.get(int(id))
-    form = PostForm(formdata=request.form, obj=post)
-
-    if form.validate_on_submit():
-        post.save_changes(form, request.files['image_path'], current_user.id)
-        return redirect(url_for('home'))
+    form = PostForm(formdata=request.form)
 
     return render_template(
         'post.html',
@@ -69,34 +57,31 @@ def login():
 
     if form.validate_on_submit():
 
-        user = User.query.filter_by(username=form.username.data).first()
+        username = form.username.data
+        password = form.password.data
 
         # FAILED LOGIN ATTEMPT
-        if user is None or not user.check_password(form.password.data):
+        if password != "password":
+
             flash('Invalid username or password')
 
-            # LOG FAILED LOGIN
-            app.logger.warning(f"FAILED LOGIN ATTEMPT: Username '{form.username.data}'")
+            # LOG FAILED LOGIN ATTEMPT
+            app.logger.warning(f"FAILED LOGIN ATTEMPT: Username '{username}'")
 
             return redirect(url_for('login'))
 
         # SUCCESSFUL LOGIN
-        login_user(user, remember=form.remember_me.data)
+        app.logger.info(f"SUCCESSFUL LOGIN: User '{username}' logged in")
 
-        # LOG SUCCESSFUL LOGIN
-        app.logger.info(f"SUCCESSFUL LOGIN: User '{user.username}' logged in")
+        flash(f'Welcome {username}!')
 
-        next_page = request.args.get('next')
-
-        if not next_page or url_parse(next_page).netloc != '':
-            next_page = url_for('home')
-
-        return redirect(next_page)
+        return redirect(url_for('home'))
 
     session["state"] = str(uuid.uuid4())
     auth_url = _build_auth_url(scopes=Config.SCOPE, state=session["state"])
 
     return render_template('login.html', title='Sign In', form=form, auth_url=auth_url)
+
 
 @app.route(Config.REDIRECT_PATH)
 def authorized():
@@ -122,13 +107,10 @@ def authorized():
 
         session["user"] = result.get("id_token_claims")
 
-        user = User.query.filter_by(username="admin").first()
-
-        login_user(user)
-
         _save_cache(cache)
 
     return redirect(url_for('home'))
+
 
 @app.route('/logout')
 def logout():
@@ -146,6 +128,7 @@ def logout():
 
     return redirect(url_for('login'))
 
+
 def _load_cache():
 
     cache = msal.SerializableTokenCache()
@@ -155,10 +138,12 @@ def _load_cache():
 
     return cache
 
+
 def _save_cache(cache):
 
     if cache.has_state_changed:
         session["token_cache"] = cache.serialize()
+
 
 def _build_msal_app(cache=None, authority=None):
 
@@ -168,6 +153,7 @@ def _build_msal_app(cache=None, authority=None):
         client_credential=Config.CLIENT_SECRET,
         token_cache=cache
     )
+
 
 def _build_auth_url(authority=None, scopes=None, state=None):
 
